@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { BrandContext } from "./BrandContext";
+import { useState, useEffect, useRef, useMemo, useContext } from "react";
+import { BrandContext, DEFAULT_THEME, computeBrandTheme } from "./BrandContext";
 import { SECTIONS, ARCHETYPES, DEFAULT_BRAND } from "../constants";
 import { TextInput, ArrayInput, ColorPicker, Card, SectionHeader, ModeToggle, CopyButton, inputBase } from "./ui";
 import { generateExportJSON, generateMarkdown } from "../utils/export";
@@ -15,8 +15,21 @@ export default function BrandBoardBuilder() {
   const [saved, setSaved] = useState(false);
   const [progress, setProgress] = useState(0);
   const [previewMode, setPreviewMode] = useState("light");
+  const [brandMode, setBrandMode] = useState(false);
   const mainRef = useRef(null);
   const update = (k, v) => setBrand(p => ({ ...p, [k]: v }));
+
+  // Compute theme based on brandMode toggle
+  const theme = useMemo(() => {
+    if (!brandMode) return DEFAULT_THEME;
+    return computeBrandTheme(brand);
+  }, [brandMode, brand.primaryColor, brand.secondaryColor, brand.accentColor,
+      brand.primaryFont, brand.secondaryFont,
+      brand.darkModeEnabled, brand.lightModeEnabled,
+      brand.darkBg, brand.darkSurface, brand.darkText, brand.darkTextSecondary, brand.darkBorder,
+      brand.lightBg, brand.lightSurface, brand.lightText, brand.lightTextSecondary, brand.lightBorder]);
+
+  const t = theme; // shorthand
 
   // Progress calculation
   useEffect(() => {
@@ -86,25 +99,44 @@ export default function BrandBoardBuilder() {
   const activeMode = previewMode === "light" ? lightMode : darkMode;
 
   return (
-    <BrandContext.Provider value={{ brand }}>
-    <div style={{ height: "100vh", background: "#0a0a0f", color: "#e0e0e0", fontFamily: "'DM Sans', sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <BrandContext.Provider value={{ brand, theme }}>
+    {/* Dynamic font loader for brand mode */}
+    {brandMode && brand.primaryFont && (
+      <link href={`https://fonts.googleapis.com/css2?family=${brand.primaryFont.replace(/ /g, "+")}:wght@400;600;700&family=${(brand.secondaryFont || "DM Sans").replace(/ /g, "+")}:wght@400;500;600&display=swap`} rel="stylesheet" />
+    )}
+    <div style={{ height: "100vh", background: t.bg, color: t.inputText, fontFamily: t.bodyFont, display: "flex", flexDirection: "column", overflow: "hidden", transition: "all 0.4s ease" }}>
       {/* Header */}
-      <header style={{ padding: "12px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(10,10,15,0.97)", backdropFilter: "blur(12px)", flexShrink: 0, zIndex: 100 }}>
+      <header style={{ padding: "12px 24px", borderBottom: `1px solid ${t.surfaceBorder}`, display: "flex", justifyContent: "space-between", alignItems: "center", background: t.headerBg, backdropFilter: "blur(12px)", flexShrink: 0, zIndex: 100, transition: "all 0.4s ease" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ width: "30px", height: "30px", borderRadius: "7px", background: "linear-gradient(135deg, #e94560, #c62a42)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: 700, color: "#fff" }}>B</div>
+          <div style={{ width: "30px", height: "30px", borderRadius: "7px", background: t.accentGradient, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: 700, color: "#fff" }}>{brand.brandName ? brand.brandName.charAt(0).toUpperCase() : "B"}</div>
           <div>
-            <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>Brand Board Builder</div>
-            <div style={{ fontSize: "9px", color: "#555", letterSpacing: "1.5px", textTransform: "uppercase" }}>AI-Powered Enterprise</div>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: brandMode ? t.text : "#fff", fontFamily: t.headingFont }}>{brandMode && brand.brandName ? brand.brandName : "Brand Board Builder"}</div>
+            <div style={{ fontSize: "9px", color: t.textDim, letterSpacing: "1.5px", textTransform: "uppercase" }}>{brandMode && brand.tagline ? brand.tagline : "AI-Powered Enterprise"}</div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {/* Brand Mode Toggle */}
+          <button
+            onClick={() => setBrandMode(!brandMode)}
+            style={{
+              padding: "5px 12px", borderRadius: "7px", cursor: "pointer",
+              background: brandMode ? `${t.accent}20` : "rgba(255,255,255,0.04)",
+              border: brandMode ? `1px solid ${t.accent}50` : "1px solid rgba(255,255,255,0.08)",
+              color: brandMode ? t.accent : "#888",
+              fontSize: "11px", fontWeight: 600, transition: "all 0.3s",
+              display: "flex", alignItems: "center", gap: "6px",
+            }}
+          >
+            <span style={{ fontSize: "14px" }}>{brandMode ? "\uD83C\uDFA8" : "\u25CB"}</span>
+            {brandMode ? "Brand View ON" : "Preview Brand"}
+          </button>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ width: "80px", height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "2px", overflow: "hidden" }}>
-              <div style={{ width: `${progress}%`, height: "100%", background: "linear-gradient(90deg, #e94560, #f39c12)", transition: "width 0.5s" }} />
+            <div style={{ width: "80px", height: "4px", background: t.surfaceBorder, borderRadius: "2px", overflow: "hidden" }}>
+              <div style={{ width: `${progress}%`, height: "100%", background: t.progressGradient, transition: "width 0.5s" }} />
             </div>
-            <span style={{ fontSize: "11px", color: "#666" }}>{progress}%</span>
+            <span style={{ fontSize: "11px", color: t.textMuted }}>{progress}%</span>
           </div>
-          <button onClick={handleSave} style={{ padding: "6px 16px", borderRadius: "7px", cursor: "pointer", background: saved ? "rgba(46,204,113,0.15)" : "rgba(255,255,255,0.06)", border: saved ? "1px solid rgba(46,204,113,0.3)" : "1px solid rgba(255,255,255,0.08)", color: saved ? "#2ecc71" : "#aaa", fontSize: "12px", fontWeight: 500, transition: "all 0.3s" }}>
+          <button onClick={handleSave} style={{ padding: "6px 16px", borderRadius: "7px", cursor: "pointer", background: saved ? "rgba(46,204,113,0.15)" : t.surface, border: saved ? "1px solid rgba(46,204,113,0.3)" : `1px solid ${t.surfaceBorder}`, color: saved ? "#2ecc71" : t.textSecondary, fontSize: "12px", fontWeight: 500, transition: "all 0.3s" }}>
             {saved ? "\u2713 Saved" : "Save"}
           </button>
         </div>
@@ -112,7 +144,7 @@ export default function BrandBoardBuilder() {
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Sidebar */}
-        <nav style={{ width: "200px", minWidth: "200px", borderRight: "1px solid rgba(255,255,255,0.06)", padding: "10px 8px", overflowY: "auto", background: "rgba(10,10,15,0.5)", flexShrink: 0 }}>
+        <nav style={{ width: "200px", minWidth: "200px", borderRight: `1px solid ${t.surfaceBorder}`, padding: "10px 8px", overflowY: "auto", background: t.sidebarBg, flexShrink: 0, transition: "all 0.4s ease" }}>
           {(() => {
             let lastGroup = "";
             return SECTIONS.map((s, i) => {
@@ -122,10 +154,10 @@ export default function BrandBoardBuilder() {
                 <div key={s.id}>
                   {showGroup && (
                     <div style={{ padding: "8px 10px 4px", marginTop: i > 0 ? "6px" : "0" }}>
-                      <div style={{ fontSize: "9px", color: "#555", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: 600 }}>{s.group}</div>
+                      <div style={{ fontSize: "9px", color: t.textDim, letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: 600, fontFamily: t.bodyFont }}>{s.group}</div>
                     </div>
                   )}
-                  <button onClick={() => scrollTo(s.id)} style={{ width: "100%", padding: "7px 10px", borderRadius: "7px", cursor: "pointer", display: "flex", alignItems: "center", gap: "7px", marginBottom: "2px", background: activeSection === s.id ? "rgba(233,69,96,0.12)" : "transparent", border: activeSection === s.id ? "1px solid rgba(233,69,96,0.2)" : "1px solid transparent", color: activeSection === s.id ? "#e94560" : "#666", transition: "all 0.15s", textAlign: "left" }}>
+                  <button onClick={() => scrollTo(s.id)} style={{ width: "100%", padding: "7px 10px", borderRadius: "7px", cursor: "pointer", display: "flex", alignItems: "center", gap: "7px", marginBottom: "2px", background: activeSection === s.id ? t.activeNavBg : "transparent", border: activeSection === s.id ? `1px solid ${t.activeNavBorder}` : "1px solid transparent", color: activeSection === s.id ? t.accent : t.textMuted, transition: "all 0.15s", textAlign: "left", fontFamily: t.bodyFont }}>
                     <span style={{ fontSize: "12px", width: "18px", textAlign: "center", opacity: 0.7 }}>{s.icon}</span>
                     <span style={{ fontSize: "11px", fontWeight: activeSection === s.id ? 600 : 400 }}>{s.label}</span>
                   </button>
@@ -136,7 +168,7 @@ export default function BrandBoardBuilder() {
         </nav>
 
         {/* Main content */}
-        <main ref={mainRef} style={{ flex: 1, overflowY: "auto", padding: "24px 32px 80px", scrollBehavior: "smooth" }}>
+        <main ref={mainRef} style={{ flex: 1, overflowY: "auto", padding: "24px 32px 80px", scrollBehavior: "smooth", background: t.bg, transition: "all 0.4s ease" }}>
           <div style={{ maxWidth: "820px" }}>
 
             {/* ====== PHASE 1: DISCOVER ====== */}
@@ -179,7 +211,7 @@ export default function BrandBoardBuilder() {
             {/* Archetype */}
             <SectionHeader id="archetype" label="Archetype" icon={"\u2B21"} />
             <Card title="Brand Archetype" description="Your brand's personality DNA. This shapes how AI writes as you.">
-              <label style={{ display: "block", marginBottom: "10px", fontSize: "13px", color: "#9e9e9e", fontWeight: 500 }}>Primary Archetype</label>
+              <label style={{ display: "block", marginBottom: "10px", fontSize: "13px", color: t.textSecondary, fontWeight: 500 }}>Primary Archetype</label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: "8px", marginBottom: "16px" }}>
                 {ARCHETYPES.map(a => (
                   <button key={a.name} onClick={() => update("archetype", a.name)} style={{ padding: "12px 10px", borderRadius: "10px", cursor: "pointer", textAlign: "left", background: brand.archetype === a.name ? `${a.color}22` : "rgba(255,255,255,0.02)", border: brand.archetype === a.name ? `2px solid ${a.color}` : "1px solid rgba(255,255,255,0.06)" }}>
@@ -188,7 +220,7 @@ export default function BrandBoardBuilder() {
                   </button>
                 ))}
               </div>
-              <label style={{ display: "block", marginBottom: "10px", fontSize: "13px", color: "#9e9e9e", fontWeight: 500 }}>Secondary (optional)</label>
+              <label style={{ display: "block", marginBottom: "10px", fontSize: "13px", color: t.textSecondary, fontWeight: 500 }}>Secondary (optional)</label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: "8px" }}>
                 {ARCHETYPES.filter(a => a.name !== brand.archetype).map(a => (
                   <button key={a.name} onClick={() => update("secondaryArchetype", brand.secondaryArchetype === a.name ? "" : a.name)} style={{ padding: "12px 10px", borderRadius: "10px", cursor: "pointer", textAlign: "left", background: brand.secondaryArchetype === a.name ? `${a.color}15` : "rgba(255,255,255,0.02)", border: brand.secondaryArchetype === a.name ? `1px solid ${a.color}88` : "1px solid rgba(255,255,255,0.06)" }}>
@@ -576,11 +608,13 @@ export default function BrandBoardBuilder() {
 
 // Phase header banner
 function PhaseHeader({ phase, label, subtitle, desc, color }) {
+  const ctx = useContext(BrandContext);
+  const th = ctx?.theme || DEFAULT_THEME;
   return (
-    <div style={{ padding: "12px 16px", background: `linear-gradient(90deg, ${color}12, transparent)`, borderRadius: "10px", border: `1px solid ${color}20`, marginBottom: "28px", marginTop: phase !== "1" ? "16px" : undefined }}>
-      <div style={{ fontSize: "10px", color, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 700, marginBottom: "2px" }}>Phase {phase}</div>
-      <div style={{ fontSize: "15px", color: "#fff", fontWeight: 600 }}>{label} {"\u2014"} {subtitle}</div>
-      <p style={{ fontSize: "11px", color: "#666", margin: "4px 0 0" }}>{desc}</p>
+    <div style={{ padding: "12px 16px", background: `linear-gradient(90deg, ${color}12, transparent)`, borderRadius: "10px", border: `1px solid ${color}20`, marginBottom: "28px", marginTop: phase !== "1" ? "16px" : undefined, transition: "all 0.3s" }}>
+      <div style={{ fontSize: "10px", color, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 700, marginBottom: "2px", fontFamily: th.bodyFont }}>Phase {phase}</div>
+      <div style={{ fontSize: "15px", color: th.text, fontWeight: 600, fontFamily: th.headingFont }}>{label} {"\u2014"} {subtitle}</div>
+      <p style={{ fontSize: "11px", color: th.textMuted, margin: "4px 0 0" }}>{desc}</p>
     </div>
   );
 }
